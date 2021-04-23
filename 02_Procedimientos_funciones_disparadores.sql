@@ -19,6 +19,7 @@ BEGIN
             dbms_output.put_line('No se ha encontrado ningún usuario con dni: '||dni_usuario); 
             --Devuelve "-1"
             RETURN -1;
+        --Si salta otra excepción mostrará el código de error y el mensaje.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);
 END;
@@ -43,6 +44,7 @@ BEGIN
             DBMS_OUTPUT.PUT_LINE('No se ha encontrado ningún curso con nombre: '||nombre_curso); 
             --Devuelve 'no_encontrado"
             RETURN 'no_encontrado';
+        --Si salta otra excepción mostrará el código de error y el mensaje.            
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);            
 END;
@@ -91,7 +93,7 @@ BEGIN
         --Esta excepción controla que no haya un registro con el mismo usuario y mismo curso.
         WHEN DUP_VAL_ON_INDEX THEN
             DBMS_OUTPUT.PUT_LINE('El usuario ya está inscrito en el curso');
-        --Esta excepción mostraría mensaje de error para cualquier otra excepción.
+        --Mostraría mensaje de error para cualquier otra excepción.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);
 END;
@@ -105,7 +107,7 @@ BEGIN
     --Si el día del mes es mayor que 15 lanza la excepción y corta el flujo
     IF EXTRACT(DAY FROM SYSDATE) > 15 THEN
         RAISE_APPLICATION_ERROR (-20001,'No es posible realizar una inscripción después del día 15 del mes.');
-    END IF;
+    END IF;   
 END;
 /
 
@@ -172,7 +174,7 @@ BEGIN
         --Esta excepción controla que no haya un registro con el mismo usuario, mismo curso y mismo mes.
         WHEN DUP_VAL_ON_INDEX THEN
             DBMS_OUTPUT.PUT_LINE('El recibo de pago ya existe');
-        --Esta excepción mostraría mensaje de error para cualquier otra excepción.
+        --Mostraría mensaje de error para cualquier otra excepción.
         WHEN OTHERS THEN
             --DBMS_OUTPUT.PUT_LINE('Se ha producido un error al crear el pago');
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);           
@@ -190,6 +192,7 @@ BEGIN
     --Devuelve el número de inscripciones del usuario
     RETURN v_num_inscripciones;
     EXCEPTION
+        --Mostraría mensaje de error para cualquier excepción que pueda saltar.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);    
 END;
@@ -248,6 +251,7 @@ BEGIN
         DBMS_OUTPUT.PUT_LINE('Suman un total de '||(v_generados + v_encontrados)||' recibos de pago para el mes de ' ||TRIM(TO_CHAR(SYSDATE, 'MONTH')));
     CLOSE c_inscripciones;
     EXCEPTION
+        --Mostraría mensaje de error para cualquier excepción que pueda saltar.    
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Se ha producido un error al crear el pago');
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);    
@@ -286,6 +290,7 @@ BEGIN
         --Excepción que controla que el estado del pago no esté ya como 'PAGADO'
         WHEN error_al_actualizar THEN
             DBMS_OUTPUT.PUT_LINE('El registro ya consta como PAGADO.');
+        --Mostraría mensaje de error para cualquier otra excepción que pueda saltar.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);        
 END;
@@ -316,6 +321,7 @@ BEGIN
             --El usuario que realizó el UPDATE
             USER);
     EXCEPTION
+        --Mostraría mensaje de error para cualquier excepción que pueda saltar.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);    
 END auditoria_pagos;
@@ -361,6 +367,7 @@ BEGIN
     END LOOP;
     CLOSE c_ocupacion;
     EXCEPTION
+        --Mostraría mensaje de error para cualquier excepción que pueda saltar.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);    
 END;
@@ -478,6 +485,7 @@ BEGIN
     END LOOP;       
     CLOSE c_instalaciones;
     EXCEPTION
+        --Mostraría mensaje de error para cualquier excepción que pueda saltar.
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);     
 END;
@@ -501,7 +509,8 @@ CREATE OR REPLACE PROCEDURE ficha_usuario(p_dni NUMBER) IS
         SELECT c.nombre, i.cod_curso, TO_CHAR(i.fecha_alta, 'DD/MM/YYYY') AS "ALTA", i.fecha_baja
             FROM inscripcion i, curso c
             WHERE i.cod_curso = c.cod_curso
-                AND i.cod_usuario = p_cod_usuario; 
+                AND i.cod_usuario = p_cod_usuario;
+    --Variable para guardar las datos obtenidos por el cursor de cada registro de la consulta anterior.                
     r_inscripciones c_inscripciones%ROWTYPE;
     --Cursor para obtener los pagos pendientes del usuario, recibe como parametro el código de usuario.
     CURSOR c_pagos(p_cod_usuario NUMBER) IS
@@ -509,12 +518,18 @@ CREATE OR REPLACE PROCEDURE ficha_usuario(p_dni NUMBER) IS
             FROM pago p
             WHERE p.cod_usuario = p_cod_usuario
                 AND UPPER(p.estado) = 'PENDIENTE';
-    r_pagos c_pagos%ROWTYPE; 
+    --Variable para guardar las datos obtenidos por el cursor de cada registro de la consulta anterior.                
+    r_pagos c_pagos%ROWTYPE;
+    --Excepción para controlar cuando no encuentre el usuario
+    usuario_no_encontrado EXCEPTION;
 BEGIN
     --A la variable v_usuario se le da el valor del codigo de usuario mediante la función buscar_usuario.
     --Que a partir del dni devuelve el código de usuario.
     v_usuario := buscar_usuario(p_dni);
-    
+    --Si v_usuario es igual a -1, quiere decir que no ha encontrado el usuario y lanza la excepción.
+    IF v_usuario = -1 THEN
+        RAISE usuario_no_encontrado;
+    END IF;
     --Cursor para obtener los datos del usuario:
     SELECT u.cod_usuario, u.dni, u.nombre, u.apellidos,  u.fecha_nac, 
          u.direccion, u.telefono, u.email
@@ -571,6 +586,10 @@ BEGIN
     CLOSE c_pagos;
     DBMS_OUTPUT.PUT_LINE('--------------------------------------------------------------------------------');   
     EXCEPTION
+        --En caso de no encontrar el usuario mostrará el siguiente mensaje
+        WHEN usuario_no_encontrado THEN
+            DBMS_OUTPUT.PUT_LINE('No es posible mostrar la ficha');
+        --Mostraría mensaje de error para cualquier otra excepción que pueda saltar.            
         WHEN OTHERS THEN
             DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);     
 END;

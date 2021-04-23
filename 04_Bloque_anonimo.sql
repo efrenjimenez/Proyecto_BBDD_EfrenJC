@@ -5,7 +5,7 @@
 DECLARE
     v_opcion NUMBER;
 BEGIN
-    v_opcion := 7;
+    v_opcion := 1;
     CASE v_opcion
     --(1)Crear una inscripción y después generar el registro en pago.   
         WHEN 1 THEN inscribir_usuario(7908602770,'Padel PAB02 M-J 19:00');
@@ -23,5 +23,9 @@ BEGIN
         WHEN 7 THEN ficha_usuario(7908602770);
     ELSE DBMS_OUTPUT.PUT_LINE('Opción no válida');
     END CASE;
+    COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Ocurrió el error ' || SQLCODE ||' mensaje: ' || SQLERRM);        
 END;
 /
